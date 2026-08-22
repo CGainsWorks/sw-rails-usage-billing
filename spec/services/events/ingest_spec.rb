@@ -80,10 +80,12 @@ RSpec.describe Events::Ingest do
   end
 
   it "accepts epoch seconds" do
-    result = ingest("timestamp" => 1.hour.ago.to_i)
+    timestamp = 1.hour.ago
+
+    result = ingest("timestamp" => timestamp.to_i)
 
     expect(result).to be_success
-    expect(result.event.occurred_at).to be_within(1.second).of(1.hour.ago)
+    expect(result.event.occurred_at.to_i).to eq(timestamp.to_i)
   end
 
   it "defaults a missing timestamp to now" do
