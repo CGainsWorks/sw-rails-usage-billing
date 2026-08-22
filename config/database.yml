@@ -1,0 +1,24 @@
+# Meterly runs on a single PostgreSQL database. Solid Queue (background jobs) and
+# Solid Cache (Rails.cache) keep their tables in that same database, so a
+# deployment needs one server and no Redis.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+  host: <%= ENV.fetch("DB_HOST", "localhost") %>
+  port: <%= ENV.fetch("DB_PORT", 5432) %>
+  username: <%= ENV.fetch("DB_USERNAME", "meterly") %>
+  password: <%= ENV.fetch("DB_PASSWORD", "meterly") %>
+
+development:
+  <<: *default
+  database: <%= ENV.fetch("DB_NAME", "meterly_development") %>
+
+test:
+  <<: *default
+  database: <%= ENV.fetch("DB_NAME", "meterly_test") %>
+
+production:
+  <<: *default
+  url: <%= ENV["DATABASE_URL"] %>
+  database: <%= ENV.fetch("DB_NAME", "meterly_production") %>

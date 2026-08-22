@@ -1,0 +1,22 @@
+<% content_for :title, "Sign in" %>
+
+<div class="card">
+  <div class="card__head"><h2>Sign in to Meterly</h2></div>
+  <div class="card__body">
+    <%= form_with url: session_path, method: :post do |form| %>
+      <div style="margin-bottom: 0.8rem;">
+        <%= form.label :email_address, "Email" %>
+        <%= form.email_field :email_address, value: params[:email_address], autofocus: true, autocomplete: "username", style: "width: 100%;" %>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <%= form.label :password, "Password" %>
+        <%= form.password_field :password, autocomplete: "current-password", style: "width: 100%;" %>
+      </div>
+      <%= form.submit "Sign in", class: "btn" %>
+    <% end %>
+
+    <p class="signed-out__hint">
+      Seeded demo login: <span class="mono">demo@meterly.test</span> / <span class="mono">password123</span>
+    </p>
+  </div>
+</div>

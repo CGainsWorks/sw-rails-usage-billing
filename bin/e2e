@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs the end to end check against a running Meterly. See script/e2e.rb.
+set -euo pipefail
+
+exec bin/rails runner script/e2e.rb "$@"

@@ -1,0 +1,107 @@
+<% content_for :title, @invoice.number || "Draft invoice" %>
+
+<div class="page-head">
+  <div>
+    <h1><%= @invoice.number || "Draft invoice ##{@invoice.id}" %> <%= status_badge(@invoice.status) %></h1>
+    <p class="small muted">
+      <%= link_to @invoice.customer.name, customer_path(@invoice.customer) %> —
+      <%= period_label(@invoice.period_start, @invoice.period_end) %>
+      <% if @invoice.metadata["prorated"] %> — prorated, the subscription ended mid-period<% end %>
+    </p>
+  </div>
+  <%= link_to "Back to invoices", invoices_path, class: "btn btn--ghost" %>
+</div>
+
+<div class="card">
+  <div class="card__head">
+    <h2>Lines</h2>
+    <span class="small muted">Plan <span class="mono"><%= @invoice.metadata["plan_code"] %></span></span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Description</th><th class="num">Quantity</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      <% @invoice.line_items.each do |item| %>
+        <tr>
+          <td>
+            <div class="stack">
+              <span><%= item.description %></span>
+              <% if item.billable_metric %>
+                <span class="mono small muted"><%= item.billable_metric.code %></span>
+              <% end %>
+            </div>
+
+            <% if item.tier_breakdown.any? %>
+              <div class="breakdown">
+                <table>
+                  <thead><tr><th>Tier</th><th class="num">Units</th><th class="num">Per unit</th><th class="num">Amount</th></tr></thead>
+                  <tbody>
+                    <% item.tier_breakdown.each do |tier| %>
+                      <tr>
+                        <td><%= tier_bound_label(tier) %></td>
+                        <td class="num"><%= quantity(tier["units"]) %></td>
+                        <td class="num"><%= unit_money(tier["unit_amount_cents"], @invoice.currency) %></td>
+                        <td class="num"><%= money(tier["amount_cents"], @invoice.currency) %></td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% elsif item.kind == "usage" %>
+              <div class="breakdown small muted">
+                <%= Billing::PricingModels.human_name(item.breakdown["model"].to_s) %> pricing —
+                billable quantity <%= quantity(item.breakdown["billable_quantity"] || item.quantity) %>
+                <% if item.breakdown["free_units"].to_f.positive? %>
+                  after <%= quantity(item.breakdown["free_units"]) %> free
+                <% end %>
+              </div>
+            <% elsif item.prorated? %>
+              <div class="breakdown small muted">
+                Prorated from <%= money(item.breakdown["full_amount_cents"], @invoice.currency) %>,
+                factor <%= item.breakdown["proration_fraction"] %>
+              </div>
+            <% end %>
+          </td>
+          <td class="num"><%= item.kind == "usage" ? quantity(item.quantity) : "—" %></td>
+          <td class="num"><%= money(item.amount_cents, @invoice.currency) %></td>
+        </tr>
+      <% end %>
+
+      <tr>
+        <td colspan="2" class="num muted small">Subtotal</td>
+        <td class="num"><%= money(@invoice.subtotal_cents, @invoice.currency) %></td>
+      </tr>
+      <tr>
+        <td colspan="2" class="num muted small">VAT at <%= number_to_percentage(@invoice.tax_rate_bps / 100.0, precision: 1) %></td>
+        <td class="num"><%= money(@invoice.tax_cents, @invoice.currency) %></td>
+      </tr>
+      <tr class="total">
+        <td colspan="2" class="num">Total</td>
+        <td class="num"><%= money(@invoice.total_cents, @invoice.currency) %></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card__head"><h2>Payment attempts</h2></div>
+  <% if @invoice.payment_attempts.any? %>
+    <table>
+      <thead><tr><th>Provider</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th>When</th></tr></thead>
+      <tbody>
+        <% @invoice.payment_attempts.each do |attempt| %>
+          <tr>
+            <td><%= attempt.provider %></td>
+            <td class="mono small"><%= attempt.provider_reference || attempt.failure_reason %></td>
+            <td class="num"><%= money(attempt.amount_cents, attempt.currency) %></td>
+            <td><%= status_badge(attempt.status) %></td>
+            <td class="small muted"><%= attempt.processed_at&.utc&.strftime("%d %b %Y %H:%M") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No payment has been attempted yet.</p>
+  <% end %>
+</div>

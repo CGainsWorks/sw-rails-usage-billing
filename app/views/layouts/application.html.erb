@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= content_for(:title) ? "#{content_for(:title)} — Meterly" : "Meterly" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar__brand">
+          Meterly
+          <span><%= current_organization&.name %></span>
+        </div>
+
+        <nav class="sidebar__nav">
+          <%= link_to "Overview", root_path, class: class_names("is-active" => current_page?(root_path)) %>
+          <%= link_to "Customers", customers_path, class: class_names("is-active" => controller_name == "customers") %>
+          <%= link_to "Plans", plans_path, class: class_names("is-active" => controller_name == "plans") %>
+          <%= link_to "Invoices", invoices_path, class: class_names("is-active" => controller_name == "invoices") %>
+          <%= link_to "Events", usage_events_path, class: class_names("is-active" => controller_name == "usage_events") %>
+          <%= link_to "Settings", settings_path, class: class_names("is-active" => controller_name == "settings") %>
+        </nav>
+
+        <div class="sidebar__footer">
+          <%= current_user&.name %>
+          <%= button_to "Sign out", session_path, method: :delete %>
+        </div>
+      </aside>
+
+      <main class="main">
+        <%= render "shared/flash" %>
+        <%= yield %>
+      </main>
+    </div>
+  </body>
+</html>

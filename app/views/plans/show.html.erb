@@ -1,0 +1,82 @@
+<% content_for :title, @plan.name %>
+
+<div class="page-head">
+  <div>
+    <h1><%= @plan.name %></h1>
+    <p class="mono small"><%= @plan.code %></p>
+  </div>
+  <%= link_to "Back to plans", plans_path, class: "btn btn--ghost" %>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat__label">Recurring fee</div>
+    <div class="stat__value"><%= money(@plan.base_amount_cents, @plan.currency) %></div>
+    <div class="stat__hint">per <%= @plan.interval == "yearly" ? "year" : "month" %></div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Minimum commitment</div>
+    <div class="stat__value"><%= money(@plan.minimum_amount_cents, @plan.currency) %></div>
+    <div class="stat__hint">trued up if usage falls short</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Subscriptions</div>
+    <div class="stat__value"><%= number_with_delimiter(@plan.subscriptions.size) %></div>
+  </div>
+</div>
+
+<% @plan.charges.each do |charge| %>
+  <div class="card">
+    <div class="card__head">
+      <h2><%= charge.display_name %></h2>
+      <span class="badge"><%= Billing::PricingModels.human_name(charge.pricing_model) %></span>
+    </div>
+    <div class="card__body">
+      <p class="small muted">
+        <span class="mono"><%= charge.billable_metric.code %></span> — <%= charge.billable_metric.aggregation_description %>
+        <% if charge.billable_metric.filters_hash.any? %>
+          , filtered to <%= charge.billable_metric.filters_hash.map { |key, values| "#{key} in #{values.join(', ')}" }.to_sentence %>
+        <% end %>
+      </p>
+
+      <% if charge.pricing_model.in?(%w[tiered volume]) %>
+        <table>
+          <thead><tr><th>Units</th><th class="num">Per unit</th><th class="num">Flat</th></tr></thead>
+          <tbody>
+            <% previous = 0 %>
+            <% Array(charge.properties["tiers"]).each do |tier| %>
+              <tr>
+                <td><%= tier_bound_label(tier.merge("from" => previous)) %></td>
+                <td class="num"><%= unit_money(tier["unit_amount_cents"], @plan.currency) %></td>
+                <td class="num"><%= money(tier["flat_amount_cents"].to_i, @plan.currency) %></td>
+              </tr>
+              <% previous = tier["up_to"] %>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p><%= charge_pricing_summary(charge) %></p>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div class="card">
+  <div class="card__head"><h2>Subscribers</h2></div>
+  <% if @subscriptions.any? %>
+    <table>
+      <thead><tr><th>Customer</th><th>Subscription</th><th>Status</th></tr></thead>
+      <tbody>
+        <% @subscriptions.each do |subscription| %>
+          <tr>
+            <td><%= link_to subscription.customer.name, customer_path(subscription.customer) %></td>
+            <td class="mono small"><%= link_to subscription.external_id, subscription_path(subscription) %></td>
+            <td><%= status_badge(subscription.status) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">Nobody is on this plan yet.</p>
+  <% end %>
+</div>

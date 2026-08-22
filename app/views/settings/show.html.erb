@@ -1,0 +1,76 @@
+<% content_for :title, "Settings" %>
+
+<div class="page-head">
+  <div><h1>Settings</h1><p>Keys for the ingest API, and where events are announced.</p></div>
+</div>
+
+<% if @issued_token.present? %>
+  <div class="card">
+    <div class="card__head"><h2>New API key</h2></div>
+    <div class="card__body">
+      <p class="small muted">Copy it now. Only a SHA-256 digest is stored, so this is the last time it can be shown.</p>
+      <p class="token-reveal mono"><%= @issued_token %></p>
+    </div>
+  </div>
+<% end %>
+
+<div class="card">
+  <div class="card__head">
+    <h2>API keys</h2>
+    <%= form_with url: api_keys_path, method: :post, class: "row" do |form| %>
+      <%= form.text_field :name, placeholder: "Production ingest", required: true %>
+      <%= form.submit "Create key", class: "btn" %>
+    <% end %>
+  </div>
+  <% if @api_keys.any? %>
+    <table>
+      <thead><tr><th>Name</th><th>Prefix</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% @api_keys.each do |key| %>
+          <tr>
+            <td><%= key.name %></td>
+            <td class="mono small"><%= key.token_prefix %>…</td>
+            <td class="small muted"><%= key.last_used_at ? "#{time_ago_in_words(key.last_used_at)} ago" : "never" %></td>
+            <td><%= status_badge(key.revoked? ? "failed" : "active") %></td>
+            <td class="num">
+              <% unless key.revoked? %>
+                <%= button_to "Revoke", api_key_path(key), method: :delete, class: "btn btn--danger", form: { data: { turbo_confirm: "Revoke this key?" } } %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No API keys yet.</p>
+  <% end %>
+</div>
+
+<div class="card">
+  <div class="card__head">
+    <h2>Webhook endpoints</h2>
+    <%= form_with url: webhook_endpoints_path, method: :post, class: "row" do |form| %>
+      <%= form.url_field :url, placeholder: "https://example.com/hooks", required: true %>
+      <%= form.submit "Add endpoint", class: "btn" %>
+    <% end %>
+  </div>
+  <% if @webhook_endpoints.any? %>
+    <table>
+      <thead><tr><th>URL</th><th>Secret</th><th class="num">Deliveries</th><th></th></tr></thead>
+      <tbody>
+        <% @webhook_endpoints.each do |endpoint| %>
+          <tr>
+            <td class="mono small"><%= endpoint.url %></td>
+            <td class="mono small muted"><%= endpoint.secret.first(12) %>…</td>
+            <td class="num"><%= endpoint.webhook_deliveries.size %></td>
+            <td class="num">
+              <%= button_to "Remove", webhook_endpoint_path(endpoint), method: :delete, class: "btn btn--danger", form: { data: { turbo_confirm: "Remove this endpoint?" } } %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No endpoints. Meterly signs every delivery with HMAC-SHA256 over the timestamp and body.</p>
+  <% end %>
+</div>

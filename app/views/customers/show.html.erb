@@ -1,0 +1,52 @@
+<% content_for :title, @customer.name %>
+
+<div class="page-head">
+  <div>
+    <h1><%= @customer.name %></h1>
+    <p class="mono small"><%= @customer.external_id %> <%= "— #{@customer.email}" if @customer.email.present? %></p>
+  </div>
+  <%= link_to "Back to customers", customers_path, class: "btn btn--ghost" %>
+</div>
+
+<div class="card">
+  <div class="card__head"><h2>Subscriptions</h2></div>
+  <% if @subscriptions.any? %>
+    <table>
+      <thead><tr><th>Subscription</th><th>Plan</th><th>Started</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% @subscriptions.each do |subscription| %>
+          <tr>
+            <td class="mono small"><%= subscription.external_id %></td>
+            <td><%= link_to subscription.plan.name, plan_path(subscription.plan) %></td>
+            <td class="small muted"><%= l subscription.started_at.to_date, format: :long %></td>
+            <td><%= status_badge(subscription.status) %></td>
+            <td class="num"><%= link_to "Usage", subscription_path(subscription), class: "small" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No subscriptions.</p>
+  <% end %>
+</div>
+
+<div class="card">
+  <div class="card__head"><h2>Invoices</h2></div>
+  <% if @invoices.any? %>
+    <table>
+      <thead><tr><th>Invoice</th><th>Period</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+        <% @invoices.each do |invoice| %>
+          <tr>
+            <td><%= link_to invoice.number || "Draft ##{invoice.id}", invoice_path(invoice), class: "mono" %></td>
+            <td class="small muted"><%= period_label(invoice.period_start, invoice.period_end) %></td>
+            <td class="num"><%= money(invoice.total_cents, invoice.currency) %></td>
+            <td><%= status_badge(invoice.status) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No invoices yet.</p>
+  <% end %>
+</div>

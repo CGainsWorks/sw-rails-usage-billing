@@ -1,0 +1,61 @@
+name: meterly
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: meterly
+      POSTGRES_PASSWORD: meterly
+      POSTGRES_DB: meterly_development
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U meterly" ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    command: bin/docker-entrypoint-dev
+    environment:
+      DB_HOST: db
+      DB_USERNAME: meterly
+      DB_PASSWORD: meterly
+      RAILS_ENV: development
+      SEED_DEMO_DATA: "true"
+    volumes:
+      - .:/meterly
+      - bundle:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  jobs:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    command: bin/jobs
+    environment:
+      DB_HOST: db
+      DB_USERNAME: meterly
+      DB_PASSWORD: meterly
+      RAILS_ENV: development
+    volumes:
+      - .:/meterly
+      - bundle:/usr/local/bundle
+    depends_on:
+      web:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  bundle:

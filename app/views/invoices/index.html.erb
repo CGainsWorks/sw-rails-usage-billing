@@ -1,0 +1,35 @@
+<% content_for :title, "Invoices" %>
+
+<div class="page-head">
+  <div><h1>Invoices</h1><p>One per subscription per billing period.</p></div>
+  <div class="row">
+    <%= link_to "All", invoices_path, class: class_names("btn", "btn--ghost" => params[:status].present?) %>
+    <%= link_to "Outstanding", invoices_path(status: "finalized"), class: class_names("btn", "btn--ghost" => params[:status] != "finalized") %>
+    <%= link_to "Paid", invoices_path(status: "paid"), class: class_names("btn", "btn--ghost" => params[:status] != "paid") %>
+  </div>
+</div>
+
+<div class="card">
+  <% if @invoices.any? %>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Customer</th><th>Period</th><th class="num">Subtotal</th><th class="num">VAT</th><th class="num">Total</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <% @invoices.each do |invoice| %>
+          <tr>
+            <td><%= link_to invoice.number || "Draft ##{invoice.id}", invoice_path(invoice), class: "mono" %></td>
+            <td><%= link_to invoice.customer.name, customer_path(invoice.customer) %></td>
+            <td class="small muted"><%= period_label(invoice.period_start, invoice.period_end) %></td>
+            <td class="num"><%= money(invoice.subtotal_cents, invoice.currency) %></td>
+            <td class="num"><%= money(invoice.tax_cents, invoice.currency) %></td>
+            <td class="num"><%= money(invoice.total_cents, invoice.currency) %></td>
+            <td><%= status_badge(invoice.status) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No invoices match.</p>
+  <% end %>
+</div>

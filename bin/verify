@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Brings the whole stack up in Docker, runs the test suite and the end to end
+# check against it, then takes it back down again. One command, no local Ruby.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+KEEP_RUNNING="${KEEP_RUNNING:-false}"
+
+cleanup() {
+  if [ "$KEEP_RUNNING" = "true" ]; then
+    echo "==> leaving the stack running (KEEP_RUNNING=true)"
+  else
+    echo "==> stopping the stack"
+    docker compose down --remove-orphans
+  fi
+}
+trap cleanup EXIT
+
+echo "==> building and starting postgres, the web process and a job worker"
+docker compose up -d --build
+
+echo "==> waiting for the web process"
+for _ in $(seq 1 90); do
+  if docker compose exec -T web curl -sf http://localhost:3000/up > /dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+echo "==> rspec"
+docker compose exec -T -e RAILS_ENV=test web bash -c "bin/rails db:prepare && bundle exec rspec --format progress"
+
+echo "==> end to end check"
+docker compose exec -T -e E2E_BASE_URL=http://web:3000 web bin/e2e
+
+echo "==> everything passed"

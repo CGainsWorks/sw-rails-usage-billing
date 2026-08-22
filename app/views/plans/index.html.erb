@@ -1,0 +1,39 @@
+<% content_for :title, "Plans" %>
+
+<div class="page-head">
+  <div><h1>Plans</h1><p>A recurring fee, plus what each metric costs.</p></div>
+</div>
+
+<div class="grid-2">
+  <% @plans.each do |plan| %>
+    <div class="card">
+      <div class="card__head">
+        <h2><%= link_to plan.name, plan_path(plan) %></h2>
+        <span class="badge"><%= plan.interval.humanize %></span>
+      </div>
+      <div class="card__body">
+        <p class="muted small"><%= plan.description %></p>
+        <p><strong><%= money(plan.base_amount_cents, plan.currency) %></strong> <span class="muted small">per <%= plan.interval == "yearly" ? "year" : "month" %></span></p>
+        <% if plan.has_minimum? %>
+          <p class="small muted">Minimum commitment <%= money(plan.minimum_amount_cents, plan.currency) %></p>
+        <% end %>
+        <table>
+          <thead><tr><th>Metric</th><th>Pricing</th></tr></thead>
+          <tbody>
+            <% plan.charges.each do |charge| %>
+              <tr>
+                <td>
+                  <div class="stack">
+                    <span><%= charge.display_name %></span>
+                    <span class="mono small muted"><%= charge.billable_metric.code %></span>
+                  </div>
+                </td>
+                <td class="small"><%= charge_pricing_summary(charge) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+</div>

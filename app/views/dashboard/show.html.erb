@@ -1,0 +1,80 @@
+<% content_for :title, "Overview" %>
+
+<div class="page-head">
+  <div>
+    <h1>Overview</h1>
+    <p><%= @organization.name %> — usage billing for <%= number_with_delimiter(@customer_count) %> <%= "customer".pluralize(@customer_count) %></p>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat__label">Active subscriptions</div>
+    <div class="stat__value"><%= number_with_delimiter(@subscription_count) %></div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Billed, last 90 days</div>
+    <div class="stat__value"><%= money(@billed_last_90_days_cents) %></div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Outstanding</div>
+    <div class="stat__value"><%= money(@outstanding_cents) %></div>
+    <div class="stat__hint"><%= @outstanding.count %> awaiting payment</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Events, last 30 days</div>
+    <div class="stat__value"><%= number_with_delimiter(@events_this_month) %></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card__head">
+      <h2>Recent invoices</h2>
+      <%= link_to "All invoices", invoices_path, class: "small" %>
+    </div>
+    <% if @recent_invoices.any? %>
+      <table>
+        <thead>
+          <tr><th>Invoice</th><th>Customer</th><th>Period</th><th class="num">Total</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <% @recent_invoices.each do |invoice| %>
+            <tr>
+              <td><%= link_to invoice.number || "Draft ##{invoice.id}", invoice_path(invoice), class: "mono" %></td>
+              <td><%= invoice.customer.name %></td>
+              <td class="small muted"><%= period_label(invoice.period_start, invoice.period_end) %></td>
+              <td class="num"><%= money(invoice.total_cents, invoice.currency) %></td>
+              <td><%= status_badge(invoice.status) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="empty">No invoices yet. Run <span class="mono">bin/rails db:seed</span> for demo data.</p>
+    <% end %>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <h2>Latest events</h2>
+      <%= link_to "All events", usage_events_path, class: "small" %>
+    </div>
+    <% if @recent_events.any? %>
+      <table>
+        <thead><tr><th>Metric</th><th>Customer</th><th>When</th></tr></thead>
+        <tbody>
+          <% @recent_events.each do |event| %>
+            <tr>
+              <td class="mono"><%= event.code %></td>
+              <td><%= event.subscription.customer.name %></td>
+              <td class="small muted"><%= time_ago_in_words(event.occurred_at) %> ago</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="empty">No usage events have been ingested yet.</p>
+    <% end %>
+  </div>
+</div>

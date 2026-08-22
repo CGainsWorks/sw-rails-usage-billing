@@ -1,0 +1,4 @@
+<% flash.each do |type, message| %>
+  <% next if type.to_s == "issued_token" %>
+  <div class="flash flash--<%= type == "alert" ? "alert" : "notice" %>"><%= message %></div>
+<% end %>

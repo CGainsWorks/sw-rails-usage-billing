@@ -1,0 +1,26 @@
+<% content_for :title, "Customers" %>
+
+<div class="page-head">
+  <div><h1>Customers</h1><p>Everyone you bill.</p></div>
+</div>
+
+<div class="card">
+  <% if @customers.any? %>
+    <table>
+      <thead><tr><th>Name</th><th>External id</th><th>Email</th><th class="num">VAT</th><th class="num">Subscriptions</th></tr></thead>
+      <tbody>
+        <% @customers.each do |customer| %>
+          <tr>
+            <td><%= link_to customer.name, customer_path(customer) %></td>
+            <td class="mono small"><%= customer.external_id %></td>
+            <td class="small muted"><%= customer.email %></td>
+            <td class="num"><%= number_to_percentage(customer.tax_rate_percentage, precision: 1) %></td>
+            <td class="num"><%= customer.subscriptions.size %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No customers yet.</p>
+  <% end %>
+</div>

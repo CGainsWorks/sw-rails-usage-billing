@@ -1,0 +1,104 @@
+<% content_for :title, @subscription.external_id %>
+
+<div class="page-head">
+  <div>
+    <h1><%= @subscription.customer.name %></h1>
+    <p class="small muted">
+      <span class="mono"><%= @subscription.external_id %></span> on
+      <%= link_to @subscription.plan.name, plan_path(@subscription.plan) %>
+      <%= status_badge(@subscription.status) %>
+    </p>
+  </div>
+  <%= link_to "Back to customer", customer_path(@subscription.customer), class: "btn btn--ghost" %>
+</div>
+
+<% if @statement %>
+  <div class="card">
+    <div class="card__head">
+      <h2>Current period</h2>
+      <span class="small muted"><%= period_label(@statement.period.starts_at, @statement.period.ends_at) %></span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Line</th><th class="num">Quantity</th><th class="num">Amount</th></tr>
+      </thead>
+      <tbody>
+        <% @statement.lines.each do |line| %>
+          <tr>
+            <td>
+              <div class="stack">
+                <span><%= line.description %></span>
+                <% if line.billable_metric %>
+                  <span class="mono small muted"><%= line.billable_metric.code %> — <%= line.billable_metric.aggregation_description %></span>
+                <% end %>
+              </div>
+            </td>
+            <td class="num"><%= line.kind == "usage" ? quantity(line.quantity) : "—" %></td>
+            <td class="num"><%= money(line.amount_cents, @statement.currency) %></td>
+          </tr>
+        <% end %>
+        <tr>
+          <td colspan="2" class="num muted small">Subtotal</td>
+          <td class="num"><%= money(@statement.subtotal_cents, @statement.currency) %></td>
+        </tr>
+        <% if @statement.tax_cents.positive? %>
+          <tr>
+            <td colspan="2" class="num muted small">VAT at <%= number_to_percentage(@statement.tax_rate_bps / 100.0, precision: 1) %></td>
+            <td class="num"><%= money(@statement.tax_cents, @statement.currency) %></td>
+          </tr>
+        <% end %>
+        <tr class="total">
+          <td colspan="2" class="num">Running total</td>
+          <td class="num"><%= money(@statement.total_cents, @statement.currency) %></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="card__body small muted">
+      This period has not been invoiced yet. The nightly billing run closes it at
+      <span class="mono"><%= @statement.period.ends_at.utc.strftime("%Y-%m-%d %H:%M UTC") %></span>.
+    </div>
+  </div>
+<% end %>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card__head"><h2>Invoices</h2></div>
+    <% if @invoices.any? %>
+      <table>
+        <thead><tr><th>Invoice</th><th>Period</th><th class="num">Total</th><th>Status</th></tr></thead>
+        <tbody>
+          <% @invoices.each do |invoice| %>
+            <tr>
+              <td><%= link_to invoice.number || "Draft ##{invoice.id}", invoice_path(invoice), class: "mono" %></td>
+              <td class="small muted"><%= period_label(invoice.period_start, invoice.period_end) %></td>
+              <td class="num"><%= money(invoice.total_cents, invoice.currency) %></td>
+              <td><%= status_badge(invoice.status) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="empty">No invoices yet.</p>
+    <% end %>
+  </div>
+
+  <div class="card">
+    <div class="card__head"><h2>Latest events</h2></div>
+    <% if @recent_events.any? %>
+      <table>
+        <thead><tr><th>Metric</th><th>Properties</th><th>When</th></tr></thead>
+        <tbody>
+          <% @recent_events.each do |event| %>
+            <tr>
+              <td class="mono small"><%= event.code %></td>
+              <td class="mono small muted"><%= event.properties.map { |key, value| "#{key}=#{value}" }.join(" ") %></td>
+              <td class="small muted"><%= event.occurred_at.utc.strftime("%d %b %H:%M") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="empty">No events for this subscription.</p>
+    <% end %>
+  </div>
+</div>

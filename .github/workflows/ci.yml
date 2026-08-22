@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    env:
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v4
+        env:
+          DEPENDENCIES_HASH: ${{ hashFiles('.ruby-version', '**/.rubocop.yml', 'Gemfile.lock') }}
+        with:
+          path: ${{ env.RUBOCOP_CACHE_ROOT }}
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.run_id }}
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github
+
+  security:
+    name: Brakeman and gem audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Scan for common Rails security vulnerabilities
+        run: bin/brakeman --no-pager
+
+      - name: Scan for known vulnerabilities in gems
+        run: bin/bundler-audit
+
+      - name: Scan for known vulnerabilities in pinned JavaScript
+        run: bin/importmap audit
+
+  test:
+    name: RSpec
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: meterly
+          POSTGRES_PASSWORD: meterly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meterly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RAILS_ENV: test
+      DB_HOST: localhost
+      DB_USERNAME: meterly
+      DB_PASSWORD: meterly
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Prepare the database
+        run: bin/rails db:prepare
+
+      - name: Run the test suite
+        run: bundle exec rspec --format progress
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: meterly
+          POSTGRES_PASSWORD: meterly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meterly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RAILS_ENV: development
+      DB_HOST: localhost
+      DB_USERNAME: meterly
+      DB_PASSWORD: meterly
+      E2E_BASE_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Prepare the database
+        run: bin/rails db:prepare
+
+      - name: Seed the demo organization
+        run: bin/rails db:seed
+
+      - name: Boot the web process and a job worker
+        run: |
+          mkdir -p tmp
+          bin/rails server -p 3000 -d
+          bin/jobs & echo $! > tmp/jobs.pid
+
+      - name: Wait for the health endpoint
+        run: |
+          for _ in $(seq 1 60); do
+            curl -sf http://localhost:3000/up > /dev/null && exit 0
+            sleep 2
+          done
+          echo "the application never became healthy"
+          exit 1
+
+      - name: Run the end to end check
+        run: bin/e2e
+
+      - name: Stop the background processes
+        if: always()
+        run: |
+          [ -f tmp/pids/server.pid ] && kill "$(cat tmp/pids/server.pid)" 2>/dev/null || true
+          [ -f tmp/jobs.pid ] && kill "$(cat tmp/jobs.pid)" 2>/dev/null || true
+
+      - name: Keep the log when something went wrong
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-log
+          path: log/development.log
+          if-no-files-found: ignore
+
+  image:
+    name: Production image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the production image
+        run: docker build -t meterly:${{ github.sha }} .
+
+      - name: Check the image boots the Rails runner
+        run: |
+          docker run --rm -e SECRET_KEY_BASE_DUMMY=1 meterly:${{ github.sha }} \
+            bin/rails runner "puts Rails.env; puts Meterly::Application.name"

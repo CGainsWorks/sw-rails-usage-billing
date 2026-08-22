@@ -1,0 +1,32 @@
+<% content_for :title, "Events" %>
+
+<div class="page-head">
+  <div><h1>Events</h1><p>The raw meter readings everything else is derived from.</p></div>
+  <div class="row">
+    <%= link_to "All", usage_events_path, class: class_names("btn", "btn--ghost" => params[:code].present?) %>
+    <% @codes.each do |code| %>
+      <%= link_to code, usage_events_path(code: code), class: class_names("btn", "btn--ghost" => params[:code] != code) %>
+    <% end %>
+  </div>
+</div>
+
+<div class="card">
+  <% if @events.any? %>
+    <table>
+      <thead><tr><th>Transaction</th><th>Metric</th><th>Customer</th><th>Properties</th><th>Occurred</th></tr></thead>
+      <tbody>
+        <% @events.each do |event| %>
+          <tr>
+            <td class="mono small"><%= event.transaction_id %></td>
+            <td class="mono small"><%= event.code %></td>
+            <td><%= event.subscription.customer.name %></td>
+            <td class="mono small muted"><%= event.properties.map { |key, value| "#{key}=#{value}" }.join(" ") %></td>
+            <td class="small muted"><%= event.occurred_at.utc.strftime("%d %b %Y %H:%M") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty">No events yet.</p>
+  <% end %>
+</div>
