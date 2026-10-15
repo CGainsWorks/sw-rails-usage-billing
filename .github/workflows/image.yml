@@ -1,0 +1,39 @@
+name: Production image
+
+# Building the image takes longer than every other check put together, so it
+# only runs when something that changes the image changes, or on request.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Gemfile
+      - Gemfile.lock
+      - .ruby-version
+      - .github/workflows/image.yml
+  workflow_dispatch:
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and boot
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the production image
+        run: docker build -t meterly:ci .
+
+      - name: Check the image boots
+        run: |
+          docker run --rm -e SECRET_KEY_BASE_DUMMY=1 meterly:ci \
+            bin/rails runner "puts Rails.env"

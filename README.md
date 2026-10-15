@@ -196,10 +196,19 @@ its own signed webhook and verify it. Nothing is stubbed.
 
 ## CI
 
-[GitHub Actions](.github/workflows/ci.yml) runs five jobs on every push: RuboCop,
-Brakeman with a gem and importmap audit, RSpec against PostgreSQL, the end to
-end check against a booted web process and worker, and a build of the production
-image. `bin/ci` runs the same static checks and the suite locally.
+[One job on one runner](.github/workflows/ci.yml) does the lot on every push:
+RuboCop, Brakeman, a gem and importmap audit, RSpec against PostgreSQL, then the
+end to end check against a booted web process and job worker. Running those as
+five parallel jobs would pay for five checkouts and five bundle installs to save
+about a minute of wall clock, which is the wrong trade on a monthly minute
+budget.
+
+The rest is kept cheap on purpose: a newer push cancels the run it supersedes,
+documentation-only commits are skipped, every job has a `timeout-minutes` so a
+hung run cannot drain the budget, and [the production image](.github/workflows/image.yml)
+is built only when the `Dockerfile` or the gems actually change. `bin/ci` runs
+the static checks and the suite locally, and `bin/verify` adds the end to end
+check.
 
 ## Design notes
 
