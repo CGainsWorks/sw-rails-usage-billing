@@ -43,7 +43,7 @@ RSpec.describe Payments::Collect do
     invoice.update!(status: "draft")
 
     expect(described_class.call(invoice: invoice)).to be_nil
-    expect(PaymentAttempt.count).to eq(0)
+    expect(invoice.payment_attempts.count).to eq(0)
   end
 
   it "raises for an unknown provider" do

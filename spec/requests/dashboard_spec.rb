@@ -100,10 +100,13 @@ RSpec.describe "Dashboard" do
       post api_keys_path, params: { name: "Ingest" }
       follow_redirect!
 
-      expect(response.body).to include("mtr_sk_")
+      token = response.body[/mtr_sk_[A-Za-z0-9]{32}/]
+      expect(token).to be_present
+      expect(organization.api_keys.sole.token_digest).to eq(ApiKey.digest(token))
 
+      # Only the digest is stored, so the token itself cannot come back.
       get settings_path
-      expect(response.body).not_to include("mtr_sk_1")
+      expect(response.body).not_to include(token)
     end
 
     it "revokes an API key" do

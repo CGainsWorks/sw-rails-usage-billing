@@ -45,8 +45,10 @@ RSpec.describe Billing::FinalizeInvoice do
     create(:webhook_endpoint, organization: organization, url: "https://second.test/hooks")
     create(:webhook_endpoint, organization: organization, url: "https://off.test/hooks", active: false)
 
-    expect { described_class.call(invoice: build_invoice) }.to change(WebhookDelivery, :count).by(2)
-    expect(WebhookDelivery.pluck(:event_type).uniq).to eq([ "invoice.finalized" ])
+    deliveries = WebhookDelivery.where(webhook_endpoint: organization.webhook_endpoints)
+
+    expect { described_class.call(invoice: build_invoice) }.to change(deliveries, :count).by(2)
+    expect(deliveries.pluck(:event_type).uniq).to eq([ "invoice.finalized" ])
   end
 
   it "does nothing to an invoice that is already finalized" do

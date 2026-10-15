@@ -26,8 +26,8 @@ RSpec.describe Events::Ingest do
     result = ingest("properties" => { "region" => "us-east-1" })
 
     expect(result.status).to eq("duplicate")
-    expect(UsageEvent.count).to eq(1)
-    expect(UsageEvent.first.properties).to eq({ "region" => "eu-west-1" })
+    expect(organization.usage_events.count).to eq(1)
+    expect(organization.usage_events.first.properties).to eq({ "region" => "eu-west-1" })
   end
 
   it "lets two organizations use the same transaction id" do
@@ -112,6 +112,6 @@ RSpec.describe Events::IngestBatch do
     expect(summary.accepted).to eq(1)
     expect(summary.rejected).to eq(1)
     expect(summary.duplicates).to eq(1)
-    expect(UsageEvent.count).to eq(1)
+    expect(organization.usage_events.count).to eq(1)
   end
 end

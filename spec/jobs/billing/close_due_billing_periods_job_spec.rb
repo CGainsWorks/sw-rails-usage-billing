@@ -55,11 +55,11 @@ RSpec.describe Billing::GenerateInvoiceJob do
     described_class.perform_now(subscription.id, "2026-01-01T00:00:00Z")
     described_class.perform_now(subscription.id, "2026-01-01T00:00:00Z")
 
-    expect(Invoice.count).to eq(1)
+    expect(subscription.invoices.count).to eq(1)
   end
 
   it "does nothing for a period that is not closed" do
     expect(described_class.perform_now(subscription.id, "2026-02-01T00:00:00Z")).to be_nil
-    expect(Invoice.count).to eq(0)
+    expect(subscription.invoices.count).to eq(0)
   end
 end

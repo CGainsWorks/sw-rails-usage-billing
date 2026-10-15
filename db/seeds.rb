@@ -1,5 +1,11 @@
 # Demo data for the dashboard and for bin/e2e. Safe to run more than once.
 #
+# The suite builds what it needs with factories, and db:prepare seeds whatever
+# database it has just created, so seeding the test database would only put
+# thousands of demo rows in the way.
+return if Rails.env.test?
+
+#
 # It builds an organization that has been trading for a couple of months, so
 # there is at least one closed billing period to invoice and one period still
 # running for the usage preview to show.

@@ -54,7 +54,7 @@ RSpec.describe Billing::GenerateInvoice do
     second = described_class.call(subscription: subscription, period: period)
 
     expect(second.id).to eq(first.id)
-    expect(Invoice.count).to eq(1)
+    expect(subscription.invoices.count).to eq(1)
   end
 
   it "survives a race that inserts the same period concurrently" do
@@ -65,8 +65,8 @@ RSpec.describe Billing::GenerateInvoice do
     generator = described_class.new(subscription: subscription, period: period)
     allow(generator).to receive(:find_existing).and_return(nil, Invoice.last)
 
-    expect(generator.call).to eq(Invoice.last)
-    expect(Invoice.count).to eq(1)
+    expect(generator.call).to eq(subscription.invoices.sole)
+    expect(subscription.invoices.count).to eq(1)
   end
 
   it "does not leave a half written invoice behind when a line fails" do
@@ -78,7 +78,7 @@ RSpec.describe Billing::GenerateInvoice do
     allow(Billing::PeriodStatement).to receive(:call).and_return(statement.with(lines: statement.lines + [ broken ]))
 
     expect { described_class.call(subscription: subscription, period: period) }.to raise_error(ActiveRecord::RecordInvalid)
-    expect(Invoice.count).to eq(0)
-    expect(InvoiceLineItem.count).to eq(0)
+    expect(subscription.invoices.count).to eq(0)
+    expect(InvoiceLineItem.where(invoice: subscription.invoices).count).to eq(0)
   end
 end

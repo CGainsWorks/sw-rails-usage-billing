@@ -71,11 +71,14 @@ jobs:
           bin/bundler-audit
           bin/importmap audit
 
+      # db:test:prepare rather than db:prepare: the latter runs db/seeds.rb when
+      # it creates the database, which would fill the test database with demo
+      # data.
       - name: Run the test suite
         env:
           RAILS_ENV: test
         run: |
-          bin/rails db:prepare
+          bin/rails db:test:prepare
           bundle exec rspec --format progress
 
       - name: Run the end to end check against a booted stack
