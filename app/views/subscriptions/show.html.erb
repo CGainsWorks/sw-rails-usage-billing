@@ -29,11 +29,11 @@
               <div class="stack">
                 <span><%= line.description %></span>
                 <% if line.billable_metric %>
-                  <span class="mono small muted"><%= line.billable_metric.code %> — <%= line.billable_metric.aggregation_description %></span>
+                  <span class="mono small muted"><%= line.billable_metric.code %> · <%= line.billable_metric.aggregation_description %></span>
                 <% end %>
               </div>
             </td>
-            <td class="num"><%= line.kind == "usage" ? quantity(line.quantity) : "—" %></td>
+            <td class="num"><%= line.kind == "usage" ? quantity(line.quantity) : "–" %></td>
             <td class="num"><%= money(line.amount_cents, @statement.currency) %></td>
           </tr>
         <% end %>

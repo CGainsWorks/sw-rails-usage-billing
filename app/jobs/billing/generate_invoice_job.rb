@@ -3,7 +3,7 @@ module Billing
     queue_as :billing
 
     # Two workers can pick up the same subscription and period; the unique
-    # index decides which one wins, and the loser finds the winner's invoice.
+    # index decides which one wins and the loser finds the winner's invoice.
     retry_on ActiveRecord::Deadlocked, wait: :polynomially_longer, attempts: 5
 
     def perform(subscription_id, period_start_iso)

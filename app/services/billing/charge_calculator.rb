@@ -1,5 +1,5 @@
 module Billing
-  # One charge, one period: aggregate the usage, price it, and describe the
+  # One charge, one period: aggregate the usage, price it and describe the
   # result the way it will appear on an invoice.
   class ChargeCalculator
     Line = Data.define(:charge, :billable_metric, :quantity, :amount_cents, :breakdown) do

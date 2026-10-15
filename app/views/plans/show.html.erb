@@ -33,7 +33,7 @@
     </div>
     <div class="card__body">
       <p class="small muted">
-        <span class="mono"><%= charge.billable_metric.code %></span> — <%= charge.billable_metric.aggregation_description %>
+        <span class="mono"><%= charge.billable_metric.code %></span> · <%= charge.billable_metric.aggregation_description %>
         <% if charge.billable_metric.filters_hash.any? %>
           , filtered to <%= charge.billable_metric.filters_hash.map { |key, values| "#{key} in #{values.join(', ')}" }.to_sentence %>
         <% end %>

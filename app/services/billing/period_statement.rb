@@ -92,7 +92,7 @@ module Billing
       end
     end
 
-    # A committed spend floor: the customer pays at least this much, and usage
+    # A committed spend floor: the customer pays at least this much and usage
     # eats into the commitment rather than adding to it.
     def minimum_true_up_line(subtotal)
       minimum = (BigDecimal(plan.minimum_amount_cents) * period.proration_fraction).round(0, BigDecimal::ROUND_HALF_UP).to_i

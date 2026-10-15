@@ -1,4 +1,4 @@
-# What gets counted, and how. A metric turns a stream of raw usage events into
+# What gets counted and how. A metric turns a stream of raw usage events into
 # a single number for a billing period.
 class BillableMetric < ApplicationRecord
   AGGREGATION_TYPES = %w[count sum max unique_count].freeze

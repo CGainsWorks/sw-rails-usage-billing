@@ -3,7 +3,7 @@
 <div class="page-head">
   <div>
     <h1><%= @customer.name %></h1>
-    <p class="mono small"><%= @customer.external_id %> <%= "— #{@customer.email}" if @customer.email.present? %></p>
+    <p class="mono small"><%= @customer.external_id %> <%= "· #{@customer.email}" if @customer.email.present? %></p>
   </div>
   <%= link_to "Back to customers", customers_path, class: "btn btn--ghost" %>
 </div>

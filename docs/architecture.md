@@ -45,7 +45,7 @@ erDiagram
 ```
 
 An **organization** is the company using Meterly, not the company being billed.
-Everything else hangs off it, and every query in the application is scoped
+Everything else hangs off it and every query in the application is scoped
 through it, so one tenant cannot read another's rows even when an id is guessed.
 
 A **billable metric** says what is counted and how: `count` of events, `sum` or

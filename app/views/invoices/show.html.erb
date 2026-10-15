@@ -4,9 +4,9 @@
   <div>
     <h1><%= @invoice.number || "Draft invoice ##{@invoice.id}" %> <%= status_badge(@invoice.status) %></h1>
     <p class="small muted">
-      <%= link_to @invoice.customer.name, customer_path(@invoice.customer) %> —
+      <%= link_to @invoice.customer.name, customer_path(@invoice.customer) %> ·
       <%= period_label(@invoice.period_start, @invoice.period_end) %>
-      <% if @invoice.metadata["prorated"] %> — prorated, the subscription ended mid-period<% end %>
+      <% if @invoice.metadata["prorated"] %> · prorated, the subscription ended mid-period<% end %>
     </p>
   </div>
   <%= link_to "Back to invoices", invoices_path, class: "btn btn--ghost" %>
@@ -50,7 +50,7 @@
               </div>
             <% elsif item.kind == "usage" %>
               <div class="breakdown small muted">
-                <%= Billing::PricingModels.human_name(item.breakdown["model"].to_s) %> pricing —
+                <%= Billing::PricingModels.human_name(item.breakdown["model"].to_s) %> pricing ·
                 billable quantity <%= quantity(item.breakdown["billable_quantity"] || item.quantity) %>
                 <% if item.breakdown["free_units"].to_f.positive? %>
                   after <%= quantity(item.breakdown["free_units"]) %> free
@@ -63,7 +63,7 @@
               </div>
             <% end %>
           </td>
-          <td class="num"><%= item.kind == "usage" ? quantity(item.quantity) : "—" %></td>
+          <td class="num"><%= item.kind == "usage" ? quantity(item.quantity) : "–" %></td>
           <td class="num"><%= money(item.amount_cents, @invoice.currency) %></td>
         </tr>
       <% end %>

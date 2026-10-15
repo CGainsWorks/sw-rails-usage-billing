@@ -9,7 +9,7 @@
 # will add to the boot time of your test suite on EVERY test run, even for an
 # individual file that may not need all of that loaded. Instead, consider making
 # a separate helper file that requires the additional dependencies and performs
-# the additional setup, and require it from the spec files that actually need
+# the additional setup and require it from the spec files that actually need
 # it.
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
@@ -32,7 +32,7 @@ RSpec.configure do |config|
   # library (such as bogus or mocha) by changing the `mock_with` option here.
   config.mock_with :rspec do |mocks|
     # Prevents you from mocking or stubbing a method that does not exist on
-    # a real object. This is generally recommended, and will default to
+    # a real object. This is generally recommended and will default to
     # `true` in RSpec 4.
     mocks.verify_partial_doubles = true
   end
@@ -45,12 +45,12 @@ RSpec.configure do |config|
   config.shared_context_metadata_behavior = :apply_to_host_groups
 
 # The settings below are suggested to provide a good initial experience
-# with RSpec, but feel free to customize to your heart's content.
+# with RSpec but feel free to customize to your heart's content.
 =begin
   # This allows you to limit a spec run to individual examples or groups
   # you care about by tagging them with `:focus` metadata. When nothing
   # is tagged with `:focus`, all examples get run. RSpec also provides
-  # aliases for `it`, `describe`, and `context` that include `:focus`
+  # aliases for `it`, `describe` and `context` that include `:focus`
   # metadata: `fit`, `fdescribe` and `fcontext`, respectively.
   config.filter_run_when_matching :focus
 
@@ -65,7 +65,7 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
 
   # Many RSpec users commonly either run the entire suite or an individual
-  # file, and it's useful to allow more verbose output when running an
+  # file and it's useful to allow more verbose output when running an
   # individual spec file.
   if config.files_to_run.one?
     # Use the documentation formatter for detailed output,

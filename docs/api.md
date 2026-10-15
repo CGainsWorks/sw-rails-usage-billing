@@ -38,7 +38,7 @@ and `{"error": {"code": "rate_limited"}}`.
 ```
 
 * `transaction_id` is the idempotency key and is unique per organization.
-* `timestamp` accepts ISO 8601 or epoch seconds, and defaults to now. It must
+* `timestamp` accepts ISO 8601 or epoch seconds and defaults to now. It must
   fall inside the subscription's lifetime and cannot be more than five minutes
   in the future.
 * `code` must match a billable metric that exists, which catches an integration

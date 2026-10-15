@@ -4,7 +4,7 @@
 #   E2E_BASE_URL=... bin/e2e       # against anything else
 #
 # It provisions a throwaway organization, sends usage over the real HTTP API,
-# closes the period through the real background worker, and then reads the
+# closes the period through the real background worker and then reads the
 # invoice back over the API. Nothing is stubbed, so a pass means the whole
 # pipeline works: ingest, idempotency, aggregation, tiered pricing, rounding,
 # invoice numbering, payment collection and signed webhook delivery.

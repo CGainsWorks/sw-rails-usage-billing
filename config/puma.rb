@@ -15,7 +15,7 @@
 # prioritize throughput over latency.
 #
 # As a rule of thumb, increasing the number of threads will increase how much
-# traffic a given process can handle (throughput), but due to CRuby's
+# traffic a given process can handle (throughput) but due to CRuby's
 # Global VM Lock (GVL) it has diminishing returns and will degrade the
 # response time (latency) of the application.
 #

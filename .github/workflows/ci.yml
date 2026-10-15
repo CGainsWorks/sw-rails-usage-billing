@@ -22,7 +22,7 @@ permissions:
 jobs:
   checks:
     name: Lint, scan, test and end to end
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Nothing here takes four minutes, so a job still running after fifteen is
     # hung and should be stopped before it eats the budget.
     timeout-minutes: 15

@@ -1,7 +1,7 @@
 module Billing
   # Billing periods are anchored to the moment a subscription started, so a
   # subscription that began on the 31st of January bills on the 28th of
-  # February, the 31st of March, and so on, without the anchor drifting to the
+  # February, the 31st of March and so on, without the anchor drifting to the
   # 28th for good. ActiveSupport::Duration#advance already clamps that way, so
   # every boundary is computed from the anchor rather than from the previous
   # boundary.

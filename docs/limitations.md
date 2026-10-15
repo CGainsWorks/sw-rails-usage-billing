@@ -1,7 +1,7 @@
 # Limitations and what would come next
 
 Meterly is a working billing engine, built and verified on a single developer
-machine. The boundaries below are deliberate, and each one is marked in the code
+machine. The boundaries below are deliberate and each one is marked in the code
 where it bites.
 
 ## No live payment provider
@@ -22,15 +22,15 @@ Swapping in a real provider means writing that one class. Nothing else in the
 billing engine knows which provider took the money.
 
 **Next:** implement the Stripe adapter, add a dunning schedule that retries a
-declined invoice on a timetable rather than once, and record partial payments.
+declined invoice on a timetable rather than once and record partial payments.
 
 ## No email
 
-Nothing is sent to a customer. Invoices are announced over webhooks, and Action
+Nothing is sent to a customer. Invoices are announced over webhooks and Action
 Mailer is configured but unused. A real deployment would email the invoice PDF
 to the billing contact.
 
-**Next:** an `InvoiceMailer` with a PDF attachment, and a bounce-handling path.
+**Next:** an `InvoiceMailer` with a PDF attachment and a bounce-handling path.
 
 ## No PDF rendering
 
@@ -40,18 +40,18 @@ Invoices render as HTML and JSON. Accounts departments want a PDF.
 
 `customer.tax_rate_bps` is a single rate applied to the whole subtotal. Real VAT
 handling needs place-of-supply rules, reverse charge for business customers in
-other countries, per-line rates for mixed goods and services, and a validated VAT
+other countries, per-line rates for mixed goods and services and a validated VAT
 number. That is a domain of its own and it is not modelled here.
 
 ## Credits, discounts and currency conversion are not modelled
 
-There are no coupons, no prepaid credit balances that usage draws down, and no
+There are no coupons, no prepaid credit balances that usage draws down and no
 multi-currency wallets. A subscription bills in its plan currency and that is
 the currency of the invoice.
 
 ## Deployment is not automated
 
-The repository ships a production `Dockerfile` that CI builds on every push, but
+The repository ships a production `Dockerfile` that CI builds on every push but
 there is no deployment pipeline and no infrastructure code. Kamal was
 deliberately left out of the generated app. Running it in production needs:
 
@@ -71,7 +71,7 @@ demo and the end to end check.
 ## Scale has not been measured
 
 The aggregation queries are indexed on `(subscription_id, code, occurred_at)`
-and run in PostgreSQL rather than in Ruby, which is the shape that matters, but
+and run in PostgreSQL rather than in Ruby, which is the shape that matters but
 no load test has been run. At high volume the next steps would be:
 
 * Partition `usage_events` by month and detach old partitions to cold storage.

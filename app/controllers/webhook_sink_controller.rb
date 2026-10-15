@@ -1,6 +1,6 @@
 # Receives the application's own webhooks so the outbound delivery path can be
 # verified over real HTTP. The signature is checked against every active
-# endpoint secret, and a receipt is recorded either way.
+# endpoint secret and a receipt is recorded either way.
 class WebhookSinkController < ActionController::API
   def create
     body = request.raw_post

@@ -2,7 +2,7 @@
 set -e
 
 # A container that was killed rather than stopped leaves its pid file behind on
-# the bind mount, and Rails then refuses to boot.
+# the bind mount and Rails then refuses to boot.
 rm -f tmp/pids/server.pid
 
 bin/rails db:prepare

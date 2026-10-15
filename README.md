@@ -1,7 +1,7 @@
 # sw-rails-usage-billing
 
 **Meterly** is a usage-based billing engine: it takes a firehose of metered
-events, works out what each customer owes for the period, and issues the
+events, works out what each customer owes for the period and issues the
 invoice.
 
 Billing per seat is arithmetic. Billing per unit of usage is where the money
@@ -9,7 +9,7 @@ quietly leaks: the same event arrives twice after a retry, a tier is applied to
 the wrong slice of the quantity, a nightly job runs twice and bills the customer
 twice, half a penny is rounded away on every one of forty lines.
 
-Meterly is built so those things cannot happen, and so the invoice can always
+Meterly is built so those things cannot happen and so the invoice can always
 explain itself.
 
 ```mermaid
@@ -43,7 +43,7 @@ Two rules do most of the work:
    [There is a test for exactly that.](spec/services/billing/generate_invoice_spec.rb)
 2. **Money is integer cents, rounded once.** Every intermediate value is a
    `BigDecimal` in cents, including sub-penny unit prices such as £0.0005 per
-   request, and the rounding happens at the end of a line rather than at the end
+   request and the rounding happens at the end of a line rather than at the end
    of a tier.
 
 ---
@@ -80,8 +80,8 @@ Nothing outside Docker is needed. No Ruby, no Node, no Redis.
 | **Metering** | Ingest API with idempotency keys, batch endpoint, per-key rate limiting, four aggregations: count, sum, max and unique count, with property filters such as `region in eu-west-1` |
 | **Pricing** | Four charge models: per unit, package, graduated tiers and volume tiers, each with a free allowance, plus a recurring fee and a minimum spend commitment |
 | **Invoicing** | Anchored billing periods, proration when a subscription is terminated mid-period, VAT per customer, gapless per-organization invoice numbers, line items that carry their own workings |
-| **Money out** | Payment collection behind an adapter, and outbound webhooks signed with HMAC-SHA256 and retried with exponential backoff |
-| **Operating it** | A dashboard for customers, plans, invoices and raw events, API keys that are shown once and stored as digests, and a nightly billing run on Solid Queue |
+| **Money out** | Payment collection behind an adapter and outbound webhooks signed with HMAC-SHA256 and retried with exponential backoff |
+| **Operating it** | A dashboard for customers, plans, invoices and raw events, API keys that are shown once and stored as digests and a nightly billing run on Solid Queue |
 
 ## The pricing engine
 
@@ -99,7 +99,7 @@ Graduated pricing slices the quantity the way income tax brackets work. Volume
 pricing puts every unit on the rate the total reached, so buying more can make
 the whole bill cheaper, which is the point of it.
 
-Each result carries a breakdown, and that breakdown is stored on the invoice
+Each result carries a breakdown and that breakdown is stored on the invoice
 line. An invoice raised in 2026 still shows the tier boundaries and rates it was
 raised under, long after the price list has moved on.
 
@@ -121,7 +121,7 @@ stop the billing of everyone else.
 
 **Terminating mid-period prorates the fee.** The period is cut at the
 termination, the recurring fee and any minimum commitment are scaled by the
-fraction of the period that was served, and only the usage inside the shortened
+fraction of the period that was served and only the usage inside the shortened
 window is billed.
 
 ## The API
@@ -159,7 +159,7 @@ The full reference, including customers, plans and webhook payloads, is in
 
 ## Tests
 
-153 examples, and the ones worth reading are the arithmetic:
+153 examples and the ones worth reading are the arithmetic:
 
 ```bash
 bin/verify                                        # everything, in Docker
@@ -196,25 +196,30 @@ its own signed webhook and verify it. Nothing is stubbed.
 
 ## CI
 
-[One job on one runner](.github/workflows/ci.yml) does the lot on every push:
-RuboCop, Brakeman, a gem and importmap audit, RSpec against PostgreSQL, then the
-end to end check against a booted web process and job worker. Running those as
+[![CI](https://github.com/CGainsWorks/sw-rails-usage-billing/actions/workflows/ci.yml/badge.svg)](https://github.com/CGainsWorks/sw-rails-usage-billing/actions/workflows/ci.yml)
+
+[One job on one runner](.github/workflows/ci.yml) does the lot on every push in
+about eighty seconds: RuboCop, Brakeman, a gem and importmap audit, RSpec against
+PostgreSQL, then the end to end check against a booted web process and job
+worker. Running those as
 five parallel jobs would pay for five checkouts and five bundle installs to save
 about a minute of wall clock, which is the wrong trade on a monthly minute
 budget.
 
 The rest is kept cheap on purpose: a newer push cancels the run it supersedes,
-documentation-only commits are skipped, every job has a `timeout-minutes` so a
-hung run cannot drain the budget, and [the production image](.github/workflows/image.yml)
-is built only when the `Dockerfile` or the gems actually change. `bin/ci` runs
-the static checks and the suite locally, and `bin/verify` adds the end to end
-check.
+documentation-only commits are skipped, every job carries a `timeout-minutes` so
+a hung run cannot drain the budget, the runner image is pinned rather than
+floating on `ubuntu-latest` and [the production image](.github/workflows/image.yml)
+is built only when the `Dockerfile` or the gems actually change.
+
+Locally, `bin/ci` runs the static checks and the suite. `bin/verify` adds the end
+to end check.
 
 ## Design notes
 
 **One database, no Redis.** Background jobs run on Solid Queue and the cache is
 Solid Cache, both in the same PostgreSQL database as the billing data. A
-deployment is one database server and one process type, and a job that enqueues
+deployment is one database server and one process type and a job that enqueues
 work inside a transaction cannot be picked up before that transaction commits.
 
 **Services, not fat models.** The domain lives in `app/services/billing`, which
@@ -223,7 +228,7 @@ is where an auditor would look: `BillingPeriod`, `Aggregator`, `PricingModels`,
 the single source of truth for what a period costs, so the mid-month quote in
 the dashboard and the invoice at the end of the month cannot disagree.
 
-**Read the architecture** in [docs/architecture.md](docs/architecture.md), and
+**Read the architecture** in [docs/architecture.md](docs/architecture.md) and
 what is deliberately left out in [docs/limitations.md](docs/limitations.md).
 
 ## Stack
