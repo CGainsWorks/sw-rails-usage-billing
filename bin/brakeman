@@ -2,6 +2,9 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# Rails generates this binstub with ARGV.unshift("--ensure-latest"), which makes
+# Brakeman exit 5 whenever a newer Brakeman has been released. That turns a green
+# repository red without a line of code changing, so the version check is left to
+# Dependabot and this only fails on actual findings.
 
 load Gem.bin_path("brakeman", "brakeman")
