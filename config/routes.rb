@@ -31,6 +31,9 @@ Rails.application.routes.draw do
   # Reports the health of the process to a load balancer.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Inbound Stripe events, verified against STRIPE_WEBHOOK_SECRET.
+  post "webhooks/stripe" => "stripe_webhooks#create", as: :stripe_webhooks
+
   # A receiver for the app's own webhooks, used by bin/e2e to prove the
   # outbound delivery path really works over HTTP. Never routed in production.
   unless Rails.env.production?

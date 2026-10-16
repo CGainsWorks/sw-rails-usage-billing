@@ -169,3 +169,25 @@ Webhooks::Signature.verify(header_value: request.headers["X-Meterly-Signature"],
 The body is `{"id": "...", "type": "...", "created_at": "...", "data": {invoice}}`.
 Failed deliveries are retried after 30s, 1m, 2m, 4m and 8m before being marked
 failed.
+
+## Inbound Stripe webhooks
+
+### POST /webhooks/stripe
+
+Not under `/api/v1` and not authenticated by API key: Stripe signs each
+delivery instead. The `Stripe-Signature` header is checked with the official
+gem (`Stripe::Webhook.construct_event`) against `STRIPE_WEBHOOK_SECRET` before
+the body is parsed, with Stripe's default tolerance of five minutes.
+
+| Answer | When |
+|---|---|
+| `200` with `{"received": true, "outcome": "..."}` | The signature is valid. The outcome is `marked_paid`, `already_paid`, `recorded_failure`, `duplicate`, `not_finalized`, `unknown_invoice` or `ignored` |
+| `400` | The signature is missing, wrong, from another secret or too old, or the body is not JSON |
+| `503` | `STRIPE_WEBHOOK_SECRET` is not configured |
+
+| Stripe event | Effect |
+|---|---|
+| `invoice.paid` | The matching Meterly invoice is marked paid and `invoice.paid` is published, once |
+| `invoice.payment_failed` | A failed payment attempt is recorded once per Stripe event id and `invoice.payment_failed` is published |
+
+Every other event type is acknowledged and ignored.
