@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "==> building and starting postgres, the web process and a job worker"
+echo "==> building and starting postgres, stripe-mock, the web process and a job worker"
 docker compose up -d --build
 
 echo "==> waiting for the web process"
@@ -29,7 +29,8 @@ for _ in $(seq 1 90); do
 done
 
 echo "==> rspec"
-docker compose exec -T -e RAILS_ENV=test web bash -c "bin/rails db:prepare && bundle exec rspec --format progress"
+# db:test:prepare rather than db:prepare, which would seed the test database.
+docker compose exec -T -e RAILS_ENV=test web bash -c "bin/rails db:test:prepare && bundle exec rspec --format progress"
 
 echo "==> end to end check"
 docker compose exec -T -e E2E_BASE_URL=http://web:3000 web bin/e2e

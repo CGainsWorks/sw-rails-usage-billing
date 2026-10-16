@@ -17,6 +17,11 @@ services:
       timeout: 3s
       retries: 30
 
+  # Stripe's API emulator, the same pinned release CI uses. The test suite
+  # drives the Stripe gateway against it; nothing here needs a Stripe account.
+  stripe:
+    image: stripe/stripe-mock:v0.206.0
+
   web:
     build:
       context: .
@@ -28,6 +33,7 @@ services:
       DB_PASSWORD: meterly
       RAILS_ENV: development
       SEED_DEMO_DATA: "true"
+      STRIPE_MOCK_URL: http://stripe:12111
     volumes:
       - .:/meterly
       - bundle:/usr/local/bundle
@@ -36,6 +42,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      stripe:
+        condition: service_started
 
   jobs:
     build:

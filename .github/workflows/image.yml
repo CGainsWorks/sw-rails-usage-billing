@@ -12,6 +12,14 @@ on:
       - Gemfile.lock
       - .ruby-version
       - .github/workflows/image.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Gemfile
+      - Gemfile.lock
+      - .ruby-version
+      - .github/workflows/image.yml
   workflow_dispatch:
 
 concurrency:

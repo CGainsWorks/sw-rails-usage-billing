@@ -10,9 +10,15 @@
 # invoice numbering, payment collection and signed webhook delivery.
 #
 # It needs a web process and a job worker (bin/jobs) to be running.
+#
+# With PAYMENT_PROVIDER=stripe (and STRIPE_API_KEY and STRIPE_API_BASE pointing
+# at stripe-mock) the invoice is collected through the Stripe gateway. With
+# STRIPE_WEBHOOK_SECRET set it also proves the Stripe webhook receiver accepts
+# a correctly signed event and refuses a forged one, over real HTTP.
 
 require "net/http"
 require "json"
+require "securerandom"
 
 BASE_URL = ENV.fetch("E2E_BASE_URL", "http://localhost:3000")
 SLUG = "e2e-check".freeze
@@ -36,13 +42,14 @@ def check(label, actual, expected)
   actual
 end
 
-def request(method, path, body: nil, token: nil)
+def request(method, path, body: nil, token: nil, headers: {})
   uri = URI.join(BASE_URL, path)
   klass = { get: Net::HTTP::Get, post: Net::HTTP::Post }.fetch(method)
   http_request = klass.new(uri)
   http_request["Content-Type"] = "application/json"
   http_request["Authorization"] = "Bearer #{token}" if token
-  http_request.body = body.to_json if body
+  headers.each { |name, value| http_request[name] = value }
+  http_request.body = body.is_a?(String) ? body : body.to_json if body
 
   response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", read_timeout: 20) do |http|
     http.request(http_request)
@@ -76,6 +83,8 @@ def teardown
   return if organization.nil?
 
   ActiveRecord::Base.transaction do
+    ProviderReference.where(record_type: "Invoice", record_id: organization.invoices.select(:id)).delete_all
+    ProviderReference.where(record_type: "Customer", record_id: organization.customers.select(:id)).delete_all
     InvoiceLineItem.where(invoice_id: organization.invoices.select(:id)).delete_all
     PaymentAttempt.where(invoice_id: organization.invoices.select(:id)).delete_all
     organization.invoices.delete_all
@@ -195,6 +204,12 @@ paid = wait_until("the payment worker") do
   body.dig("invoice", "status") == "paid" ? body["invoice"] : nil
 end
 check("payment recorded", paid && PaymentAttempt.where(invoice_id: invoice.id).succeeded.count, 1) if paid
+provider = ENV.fetch("PAYMENT_PROVIDER", "simulated")
+check("collected by", PaymentAttempt.where(invoice_id: invoice.id).succeeded.pick(:provider), provider) if paid
+if paid && provider == "stripe"
+  stripe_invoice_id = ProviderReference.external_id_for(provider: "stripe", record: invoice, kind: "invoice")
+  check("Stripe invoice reference stored", stripe_invoice_id.to_s.start_with?("in_"), true)
+end
 
 step "Confirm the signed webhook arrived"
 receipt = wait_until("the webhook sink") do
@@ -205,6 +220,26 @@ receipt = wait_until("the webhook sink") do
   end
 end
 check("webhook signature verified", receipt && receipt["signature_valid"], true) if receipt
+
+if (stripe_secret = ENV["STRIPE_WEBHOOK_SECRET"].presence)
+  step "Send signed and forged Stripe webhooks to the receiver"
+  stripe_invoice_id = ProviderReference.external_id_for(provider: "stripe", record: invoice, kind: "invoice")
+  event_body = { id: "evt_e2e_#{SecureRandom.hex(8)}", object: "event", type: "invoice.paid",
+                 data: { object: { id: stripe_invoice_id || "in_e2e_unmirrored", object: "invoice",
+                                   metadata: { meterly_invoice_id: invoice.id.to_s } } } }.to_json
+  sign = lambda do |secret|
+    now = Time.now
+    Stripe::Webhook::Signature.generate_header(now, Stripe::Webhook::Signature.compute_signature(now, event_body, secret))
+  end
+
+  code, body = request(:post, "/webhooks/stripe", body: event_body, headers: { "Stripe-Signature" => sign.call(stripe_secret) })
+  check("signed event status", code, 200)
+  check("signed event outcome", body["outcome"], "already_paid")
+
+  code, _body = request(:post, "/webhooks/stripe", body: event_body,
+                        headers: { "Stripe-Signature" => sign.call("whsec_#{SecureRandom.hex(24)}") })
+  check("forged event status", code, 400)
+end
 
 step "Tidy up"
 teardown

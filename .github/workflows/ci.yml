@@ -41,17 +41,30 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Stripe's own API emulator. It validates every request against Stripe's
+      # OpenAPI specification, so the Stripe gateway is exercised through the
+      # official gem without an account or a key. Pinned to the release whose
+      # API version matches the stripe gem in Gemfile.lock.
+      stripe:
+        image: stripe/stripe-mock:v0.206.0
+        ports:
+          - 12111:12111
+
     env:
       DB_HOST: localhost
       DB_USERNAME: meterly
       DB_PASSWORD: meterly
+      # The lockfile is the contract: fail rather than resolve gems afresh.
+      BUNDLE_FROZEN: "true"
+      STRIPE_MOCK_URL: http://localhost:12111
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.3"
+          # The same patch release as the production image.
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: Install libpq only if the runner image lacks it
@@ -59,6 +72,17 @@ jobs:
           dpkg -s libpq-dev > /dev/null 2>&1 && exit 0
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libpq-dev
+
+      # Throwaway values made for this run only. stripe-mock accepts any
+      # sk_test_ key and the webhook secret only has to match between the
+      # signer and the receiver, so nothing secret is committed or stored.
+      - name: Generate throwaway Stripe credentials
+        run: |
+          key="sk_test_$(openssl rand -hex 16)"
+          secret="whsec_$(openssl rand -hex 24)"
+          echo "::add-mask::$secret"
+          echo "STRIPE_API_KEY=$key" >> "$GITHUB_ENV"
+          echo "STRIPE_WEBHOOK_SECRET=$secret" >> "$GITHUB_ENV"
 
       - name: Lint code for consistent style
         run: bin/rubocop -f github
@@ -78,13 +102,22 @@ jobs:
         env:
           RAILS_ENV: test
         run: |
+          for _ in $(seq 1 30); do
+            curl -s -o /dev/null -u "$STRIPE_API_KEY:" "$STRIPE_MOCK_URL/v1/customers" && break
+            sleep 1
+          done
           bin/rails db:test:prepare
           bundle exec rspec --format progress
 
+      # The web process and the worker collect through the Stripe gateway here,
+      # pointed at stripe-mock, so the whole pipeline runs through the official
+      # client over HTTP.
       - name: Run the end to end check against a booted stack
         env:
           RAILS_ENV: development
           E2E_BASE_URL: http://localhost:3000
+          PAYMENT_PROVIDER: stripe
+          STRIPE_API_BASE: http://localhost:12111
         run: |
           bin/rails db:prepare
           bin/rails db:seed
