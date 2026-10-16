@@ -4,25 +4,44 @@ Meterly is a working billing engine, built and verified on a single developer
 machine. The boundaries below are deliberate and each one is marked in the code
 where it bites.
 
-## No live payment provider
+## Stripe is emulated, never live
 
-`Payments::SimulatedGateway` is the only gateway that is implemented. Charging a
-real card needs a merchant account, live API credentials and a publicly
-reachable callback URL, none of which belong in a portfolio repository, so
-collection is simulated:
+Collection has two adapters behind `Payments::Gateway`:
 
-* Every charge succeeds, except for customers whose `external_id` starts with
-  `decline_`, which always fail with `card_declined`. That is how the seed data
-  and the specs exercise the failed-payment path deterministically.
-* `Payments::StripeGateway` is a stub that raises `NotImplementedError`. It
-  carries the shape of the real implementation in a comment, including the
-  idempotency key that stops a retried job charging a card twice.
+* `Payments::SimulatedGateway`, the default, is deterministic and offline.
+  Every charge succeeds except for customers whose `external_id` starts with
+  `decline_`, which always fail with `card_declined`. The demo seed always uses
+  it, so the declined demo customers stay declined.
+* `Payments::StripeGateway` is a real implementation on the official `stripe`
+  gem: customers, a Product per plan, a Billing Meter per metric, a metered
+  Price per charge, meter events, invoices with one item per Meterly line,
+  finalise and pay, all with idempotency keys and a webhook receiver that
+  verifies `Stripe-Signature`.
 
-Swapping in a real provider means writing that one class. Nothing else in the
-billing engine knows which provider took the money.
+What has and has not been exercised:
 
-**Next:** implement the Stripe adapter, add a dunning schedule that retries a
-declined invoice on a timetable rather than once and record partial payments.
+* **Exercised in CI:** every Stripe call, through the official client over
+  HTTP, against `stripe/stripe-mock:v0.206.0`. stripe-mock validates each
+  request against Stripe's OpenAPI specification, so a malformed request fails
+  the build. The end to end check collects its invoice through this gateway.
+* **Not exercised:** Stripe itself. stripe-mock is stateless and answers with
+  fixture objects: it does not keep what was created, does not total invoice
+  items, never declines a card and never sends webhooks. The decline and outage
+  paths are tested by raising the gem's own `Stripe::CardError` and
+  `Stripe::APIConnectionError` at the client and the webhook receiver is tested
+  with events signed in the test using a secret generated for that run.
+* **Not done:** a run against a Stripe account in test mode. That needs an
+  `sk_test_` key and, for webhooks, a publicly reachable URL or the Stripe CLI
+  forwarding events, none of which belong in a public repository.
+* Stripe meters only count or sum and cannot filter on event properties, so
+  `max`, `unique_count` and filtered metrics are not published to Stripe.
+  Package and volume prices with a free allowance cannot be expressed exactly
+  either. The catalogue sync skips those charges and says why, rather than
+  publishing a price that would disagree with the invoice.
+
+**Next:** a test-mode run with the Stripe CLI forwarding webhooks, a dunning
+schedule that retries a declined invoice on a timetable rather than once and
+partial payments.
 
 ## No email
 

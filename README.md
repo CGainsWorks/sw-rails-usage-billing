@@ -25,7 +25,7 @@ flowchart LR
       CLOCK["Nightly close<br/>Solid Queue"] -.->|"period ended"| AGG
     end
 
-    INV --> PAY["Payment adapter"]
+    INV --> PAY["Payment adapter<br/>simulated or Stripe"]
     INV --> HOOK["Signed webhook<br/>HMAC-SHA256"]
 
     style RAILS fill:#0f2f20,color:#fff
@@ -80,7 +80,7 @@ Nothing outside Docker is needed. No Ruby, no Node, no Redis.
 | **Metering** | Ingest API with idempotency keys, batch endpoint, per-key rate limiting, four aggregations: count, sum, max and unique count, with property filters such as `region in eu-west-1` |
 | **Pricing** | Four charge models: per unit, package, graduated tiers and volume tiers, each with a free allowance, plus a recurring fee and a minimum spend commitment |
 | **Invoicing** | Anchored billing periods, proration when a subscription is terminated mid-period, VAT per customer, gapless per-organization invoice numbers, line items that carry their own workings |
-| **Money out** | Payment collection behind an adapter and outbound webhooks signed with HMAC-SHA256 and retried with exponential backoff |
+| **Money out** | Payment collection behind an adapter: a deterministic simulated gateway by default and a Stripe gateway on the official `stripe` gem, exercised in CI against `stripe-mock` (no live Stripe account is used). Signed inbound Stripe webhooks and outbound webhooks signed with HMAC-SHA256 and retried with exponential backoff |
 | **Operating it** | A dashboard for customers, plans, invoices and raw events, API keys that are shown once and stored as digests and a nightly billing run on Solid Queue |
 
 ## The pricing engine
@@ -157,9 +157,120 @@ Send it again with the same `transaction_id` and the answer is
 The full reference, including customers, plans and webhook payloads, is in
 [docs/api.md](docs/api.md).
 
+## Sending usage from other services
+
+Any service that does metered work reports it the same way: one event per unit
+of work, keyed by an id the service already has, so a retry is free. None of
+the sibling portfolio repositories is wired up to Meterly yet; this is how each
+of them would be.
+
+**One-time setup, per service.** The catalogue has no API yet, so the metric
+and plan are created in a seed or the Rails console. Customers and
+subscriptions do have an API, so the calling service can provision its own
+tenants.
+
+```ruby
+# bin/rails runner, once
+org = Organization.find_by!(slug: "acme")
+tokens = org.billable_metrics.create!(code: "llm_tokens", name: "LLM tokens",
+                                      aggregation_type: "sum", property_name: "tokens")
+plan = org.plans.create!(code: "llm_pay_as_you_go", name: "LLM pay as you go", currency: "GBP")
+# 0.002p a token for the first million in the period, then 0.001p
+plan.charges.create!(billable_metric: tokens, pricing_model: "tiered",
+                     properties: { "tiers" => [ { "up_to" => 1_000_000, "unit_amount_cents" => "0.002" },
+                                                { "up_to" => nil, "unit_amount_cents" => "0.001" } ] })
+```
+
+**Token counts from the LLM serving repositories.** The inference server
+already knows the request id and the prompt and completion token counts the
+model reported. After each response it posts them as one `sum` event:
+
+```python
+import os
+import httpx
+
+METERLY_URL = os.environ["METERLY_URL"]          # e.g. http://meterly:3000
+METERLY_API_KEY = os.environ["METERLY_API_KEY"]  # an mtr_sk_ key from Settings
+
+def report_tokens(subscription_id: str, request_id: str, usage: dict, model: str) -> None:
+    event = {
+        "transaction_id": f"llm-{request_id}",        # the idempotency key
+        "external_subscription_id": subscription_id,  # one per tenant or API key
+        "code": "llm_tokens",
+        "properties": {
+            "tokens": usage["prompt_tokens"] + usage["completion_tokens"],
+            "model": model,
+        },
+    }
+    response = httpx.post(f"{METERLY_URL}/api/v1/events", json={"event": event},
+                          headers={"Authorization": f"Bearer {METERLY_API_KEY}"}, timeout=5)
+    response.raise_for_status()  # 201 accepted, 200 duplicate, 422 says why it was rejected
+```
+
+A `model` property lets a second metric with a filter such as
+`{"model": ["llama-3-8b-ft"]}` price one model differently from another.
+
+**High-volume senders** should buffer and flush through
+`POST /api/v1/events/batch` (up to 500 events a request, reported on one by
+one) rather than one request per event, because each API key is rate limited to
+600 requests a minute. Re-sending a whole batch after a timeout is safe: rows
+already stored come back as `duplicate`.
+
+| Sibling service | Metric | Aggregation | Transaction id |
+|---|---|---|---|
+| ml-domain-llm-finetune-serve | `llm_tokens`, property `tokens` | `sum` | the inference request id |
+| sw-saas-platform | `api_requests` | `count` | the request id |
+| sw-iot-telemetry-platform | `ingested_gb`, property `gigabytes` | `sum` | device id plus message sequence number |
+| sw-n8n-opportunity-radar | `scored_notices` | `count` | the notice id |
+
+In the other direction, a service that needs to react to billing subscribes a
+webhook endpoint to `invoice.finalized`, `invoice.paid` and
+`invoice.payment_failed` and verifies `X-Meterly-Signature` as described in
+[docs/api.md](docs/api.md#webhooks).
+
+## Collecting through Stripe
+
+`PAYMENT_PROVIDER=stripe` swaps the simulated gateway for
+[`Payments::StripeGateway`](app/services/payments/stripe_gateway.rb), built on
+the official `stripe` gem (20.x, API version `2026-09-30.endive`). Meterly stays
+the rating engine: when an invoice is charged, it is mirrored into Stripe as one
+invoice item per Meterly line plus the tax, then finalised and paid. Stripe
+never re-rates the usage, so the two totals cannot drift and the gateway
+refuses to send an invoice whose lines do not add up to its total.
+
+| | |
+|---|---|
+| **Customers** | Created on first charge and remembered in `provider_references`, so the billing tables carry no Stripe columns |
+| **Metered prices** | `bin/rails "stripe:sync_catalogue[acme]"` publishes a Product per plan, a Billing Meter per metric and a metered Price per charge, translating per unit, graduated, volume and package pricing. Charges Stripe cannot express exactly are skipped with the reason |
+| **Meter events** | With `STRIPE_MIRROR_USAGE=true`, each newly accepted event is copied to its meter, identified by its transaction id so Stripe deduplicates replays too |
+| **Invoices** | Created, itemised, finalised and paid with idempotency keys derived from Meterly ids, so a retried job cannot charge twice. A declined card is a failed attempt; an outage is retried with backoff |
+| **Webhooks** | `POST /webhooks/stripe` verifies `Stripe-Signature` with the gem and applies `invoice.paid` and `invoice.payment_failed`, each at most once |
+
+| Variable | Meaning |
+|---|---|
+| `STRIPE_API_KEY` | A secret key. In CI it is a throwaway `sk_test_` value generated for the run |
+| `STRIPE_API_BASE` | Optional. Points the client at `stripe-mock` instead of `api.stripe.com` |
+| `STRIPE_WEBHOOK_SECRET` | The endpoint's signing secret. In CI and the specs it is generated for the run, never committed |
+| `STRIPE_MIRROR_USAGE` | `true` to copy usage events to Stripe meters |
+
+**What is simulated.** CI runs the gateway against
+[stripe-mock](https://github.com/stripe/stripe-mock) `v0.206.0`, Stripe's own
+emulator, as a service container. It validates every request against Stripe's
+API specification but is stateless, never declines a card and never sends
+webhooks, so those paths are tested by raising the gem's own errors at the
+client and by signing events in the test. Nothing has been run against a Stripe
+account, in test mode or live. See [docs/limitations.md](docs/limitations.md).
+
+To run the Stripe specs locally:
+
+```bash
+docker run --rm -p 12111:12111 stripe/stripe-mock:v0.206.0
+STRIPE_MOCK_URL=http://localhost:12111 bundle exec rspec spec/services/payments
+```
+
 ## Tests
 
-153 examples and the ones worth reading are the arithmetic:
+188 examples and the ones worth reading are the arithmetic:
 
 ```bash
 bin/verify                                        # everything, in Docker
@@ -174,6 +285,9 @@ docker compose exec -e RAILS_ENV=test web bundle exec rspec
 | [Invoicing](spec/services/billing/generate_invoice_spec.rb) | Idempotency, a lost race, a rolled back write |
 | [Ingest](spec/services/events/ingest_spec.rb) | Replays, unknown subscriptions, clock skew, epoch timestamps |
 | [Webhooks](spec/services/webhooks/signature_spec.rb) | Signature verification, altered payloads, replays outside the tolerance |
+| [Stripe gateway](spec/services/payments/stripe_gateway_spec.rb) | Customers, catalogue, meter events and invoices through the official gem against stripe-mock; idempotent retries, declines, outages |
+| [Stripe pricing](spec/services/payments/stripe_catalogue_spec.rb) | Each Meterly pricing model translated to a Stripe price and the shapes refused |
+| [Stripe webhooks](spec/requests/stripe_webhooks_spec.rb) | Signatures from a runtime secret, forged and altered bodies, stale timestamps, redelivery |
 
 ### The end to end check
 
@@ -181,7 +295,11 @@ docker compose exec -e RAILS_ENV=test web bundle exec rspec
 events over HTTP, replays one, quotes the open period, closes the finished
 period through the real Solid Queue worker, reads the invoice back over the API
 and asserts the totals to the penny, then waits for the application to receive
-its own signed webhook and verify it. Nothing is stubbed.
+its own signed webhook and verify it. Nothing in the application is stubbed.
+
+In CI the worker collects through the Stripe gateway against stripe-mock and
+the check then posts a correctly signed and a forged Stripe event to
+`/webhooks/stripe`, expecting a 200 and a 400.
 
 ```
  6. Quote the period that is still running
@@ -190,18 +308,26 @@ its own signed webhook and verify it. Nothing is stubbed.
     ok    invoice subtotal: 10578
     ok    invoice VAT: 2116
     ok    invoice total: 12694
+ 9. Confirm the invoice was collected
+    ok    collected by: stripe
 10. Confirm the signed webhook arrived
     ok    webhook signature verified: true
+11. Send signed and forged Stripe webhooks to the receiver
+    ok    signed event status: 200
+    ok    forged event status: 400
 ```
 
 ## CI
 
 [![CI](https://github.com/CGainsWorks/sw-rails-usage-billing/actions/workflows/ci.yml/badge.svg)](https://github.com/CGainsWorks/sw-rails-usage-billing/actions/workflows/ci.yml)
 
-[One job on one runner](.github/workflows/ci.yml) does the lot on every push in
-about eighty seconds: RuboCop, Brakeman, a gem and importmap audit, RSpec against
-PostgreSQL, then the end to end check against a booted web process and job
-worker. Running those as
+[One job on one runner](.github/workflows/ci.yml) does the lot on every push:
+RuboCop (`rubocop-rails-omakase`), Brakeman, bundler-audit and an importmap
+audit, RSpec against PostgreSQL and stripe-mock service containers, then the end
+to end check against a booted web process and job worker collecting through the
+Stripe gateway. Bundler runs frozen, so a Gemfile change without its
+`Gemfile.lock` fails the build and Ruby is installed from `.ruby-version`, the
+same patch release as the production image. Running those as
 five parallel jobs would pay for five checkouts and five bundle installs to save
 about a minute of wall clock, which is the wrong trade on a monthly minute
 budget.
@@ -234,4 +360,7 @@ what is deliberately left out in [docs/limitations.md](docs/limitations.md).
 ## Stack
 
 Ruby 3.3, Rails 8.1, PostgreSQL 16, Solid Queue, Solid Cache, Hotwire, Propshaft,
-RSpec, Docker. No JavaScript build step and no CSS framework.
+the `stripe` gem, RSpec, stripe-mock, Docker. No JavaScript build step and no CSS
+framework.
+
+Current state, what is simulated and what is left: [STATUS.md](STATUS.md).

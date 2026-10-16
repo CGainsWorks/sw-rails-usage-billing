@@ -72,7 +72,7 @@ timestamp and a JSONB property bag.
 | `Billing::FinalizeInvoice` | Numbering under an advisory lock, then webhook and collection |
 | `Events::Ingest` | Validation, subscription resolution, deduplication |
 | `Webhooks::*` | Signing, delivery, backoff |
-| `Payments::*` | Gateway adapter and the record of each attempt |
+| `Payments::*` | Gateway adapters (simulated and Stripe), the Stripe catalogue translation, the Stripe webhook handler and the record of each attempt |
 
 `PeriodStatement` is deliberately the only place that knows what a period costs.
 The dashboard preview, the `current_usage` API and the invoice all render the
@@ -123,5 +123,7 @@ the way a human-chosen password would.
 | Two workers close the same period | One invoice is written, the loser reads it back |
 | A property is not a number | That event is skipped, the rest of the period bills normally |
 | Payment declines | The invoice stays `finalized`, the attempt is recorded, `invoice.payment_failed` is sent |
+| Stripe is unreachable or rate limiting | The charge job retries with backoff, replaying the same idempotency keys, so the card is charged at most once |
+| Stripe redelivers a webhook | `invoice.paid` finds the invoice already paid; a failure is recorded once per Stripe event id |
 | Webhook receiver is down | Backoff of 30s, 1m, 2m, 4m, 8m, then the delivery is marked `failed` |
 | Invoice line fails validation | The whole invoice rolls back, nothing half written is left |
