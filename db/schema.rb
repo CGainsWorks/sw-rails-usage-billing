@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_01_000010) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_000011) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -155,6 +155,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_01_000010) do
     t.datetime "updated_at", null: false
     t.index ["organization_id", "code"], name: "index_plans_on_organization_id_and_code", unique: true
     t.index ["organization_id"], name: "index_plans_on_organization_id"
+  end
+
+  create_table "provider_references", force: :cascade do |t|
+    t.string "provider", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.string "kind", null: false
+    t.string "external_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["provider", "kind", "external_id"], name: "index_provider_references_on_external_id"
+    t.index ["provider", "record_type", "record_id", "kind"], name: "index_provider_references_on_record_and_kind", unique: true
+    t.index ["record_type", "record_id"], name: "index_provider_references_on_record"
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
