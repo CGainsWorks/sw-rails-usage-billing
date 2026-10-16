@@ -5,6 +5,11 @@ set -e
 # the bind mount and Rails then refuses to boot.
 rm -f tmp/pids/server.pid
 
+# The gems live in a named volume that outlives the image, so after a Gemfile
+# change the volume still holds the old set. Install whatever is missing before
+# anything boots. The job worker waits for this container to be healthy.
+bundle check > /dev/null || bundle install
+
 bin/rails db:prepare
 
 if [ "$SEED_DEMO_DATA" = "true" ]; then
