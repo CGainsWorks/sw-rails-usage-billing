@@ -198,12 +198,15 @@ end
 
 # Close every period that has already finished and then take the money, so the
 # dashboard has finished invoices to show. In production the nightly job does
-# both steps instead.
+# both steps instead. The demo history is always collected by the simulated
+# gateway, whatever PAYMENT_PROVIDER says, so its declined customers stay
+# declined.
+demo_gateway = Payments::SimulatedGateway.new
 organization.subscriptions.find_each do |subscription|
   subscription.closed_billing_periods.each do |period|
     invoice = Billing::GenerateInvoice.call(subscription: subscription, period: period)
     Billing::FinalizeInvoice.call(invoice: invoice)
-    Payments::Collect.call(invoice: invoice.reload)
+    Payments::Collect.call(invoice: invoice.reload, gateway: demo_gateway)
   end
 end
 

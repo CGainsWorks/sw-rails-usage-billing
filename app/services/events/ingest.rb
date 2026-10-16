@@ -23,6 +23,9 @@ module Events
       return Result.new(event: nil, duplicate: false, errors: errors) if errors.any?
 
       event = create_event
+      # Only a newly stored event is mirrored, so a replay never reaches the
+      # provider twice.
+      Payments::MirrorUsageJob.perform_later(event.id) if Payments::Gateway.mirror_usage?
       Result.new(event: event, duplicate: false, errors: [])
     rescue ActiveRecord::RecordInvalid => e
       # The uniqueness validation and the unique index can both catch a replay,

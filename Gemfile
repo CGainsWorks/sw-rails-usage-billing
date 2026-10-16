@@ -31,6 +31,10 @@ gem "bootsnap", require: false
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
 gem "thruster", require: false
 
+# The official Stripe client, used by Payments::StripeGateway. Pinned to the
+# major whose API version the pinned stripe/stripe-mock image in CI serves.
+gem "stripe", "~> 20.0"
+
 
 group :development, :test do
   # Behaviour-driven test framework [https://rspec.info]
